@@ -1,0 +1,1 @@
+../t2tscript/seperate.sh

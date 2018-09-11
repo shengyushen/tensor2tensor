@@ -23,6 +23,7 @@ import copy
 import functools
 import math
 import time
+import sys
 
 # Dependency imports
 
@@ -85,6 +86,7 @@ class T2TModel(base.Layer):
     Returns:
       a T2TModel
     """
+    tf.logging.info("SSY : __init__ T2TModel %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     # Determine name first: use registered name if possible, class name else.
     default_name = registry.default_name(type(self))
     name = self.REGISTERED_NAME or default_name
@@ -112,6 +114,11 @@ class T2TModel(base.Layer):
 
     self._decode_hparams = copy.copy(decode_hparams or
                                      decoding.decode_hparams())
+    
+    if data_parallelism is not None:
+      tf.logging.info("SSY : real data_parallelism %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
+    else:
+      tf.logging.info("SSY : none data_parallelism %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     self._data_parallelism = data_parallelism or eu.Parallelism([""])
     self._num_datashards = self._data_parallelism.n
     self._ps_devices = self._data_parallelism.ps_devices
@@ -151,6 +158,7 @@ class T2TModel(base.Layer):
     with self._eager_var_store.as_default():
       self._fill_problem_hparams_features(features)
       sharded_features = self._shard_features(features)
+      tf.logging.info("SSY : calling self.model_fn_sharded %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
       sharded_logits, losses = self.model_fn_sharded(sharded_features)
       if isinstance(sharded_logits, dict):
         concat_logits = {}
@@ -170,20 +178,25 @@ class T2TModel(base.Layer):
                               "and set use_body_sharded to True.")
 
   def model_fn_sharded(self, sharded_features):
+    tf.logging.info("SSY : %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     dp = self._data_parallelism
     summarize_features(sharded_features, num_shards=dp.n)
     datashard_to_features = self._to_features_per_datashard(sharded_features)
     if self.use_body_sharded:
       # MoE models override body_sharded
+      tf.logging.info("SSY : sharding input %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
       transformed_features = dp(self.bottom, datashard_to_features)
+      tf.logging.info("SSY : sharding body %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
       body_out = self.body_sharded(
           self._to_single_features_dict(transformed_features))
       body_out, losses = self._normalize_body_output(body_out)
       if "training" in losses:
+        tf.logging.info("SSY : training branch %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
         log_info("Skipping T2TModel top and loss because training loss "
                  "returned from body")
         sharded_logits = body_out
       else:
+        tf.logging.info("SSY : sharding loss %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
         if isinstance(body_out, dict):
           sharded_logits = collections.OrderedDict()
           sharded_losses = collections.OrderedDict()
@@ -417,6 +430,7 @@ class T2TModel(base.Layer):
       log_info("Dividing learning rate by num_async_replicas: %d",
                num_async_replicas)
     lr /= math.sqrt(float(num_async_replicas))
+    tf.logging.info("SSY : %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     train_op = optimize.optimize(
         loss, lr, self.hparams, use_tpu=common_layers.is_on_tpu())
     return train_op
@@ -885,6 +899,10 @@ class T2TModel(base.Layer):
         v = tf.tile(v, tf.to_int32([self._num_datashards]))
       sharded_features[k] = self._data_parallelism(
           tf.identity, tf.split(v, self._num_datashards, 0))
+      tf.logging.info("SSY : in for loop %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
+      tf.logging.info("k {}".format(k))
+      tf.logging.info("v {}".format(v))
+      tf.logging.info("sharded_features[k] {}".format(sharded_features[k]))
     return sharded_features
 
   def _to_features_per_datashard(self, features):
@@ -908,9 +926,11 @@ class T2TModel(base.Layer):
                               hparams,
                               decode_hparams=None,
                               use_tpu=False):
+    tf.logging.info("SSY : creating estimator model fn %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     model_cls = registry.model(model_name)
 
     def wrapping_model_fn(features, labels, mode, params=None, config=None):
+      tf.logging.info("SSY : wrapping_model_fn calling model_cls.estimator_model_fn %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
       return model_cls.estimator_model_fn(
           hparams,
           features,
@@ -948,18 +968,23 @@ class T2TModel(base.Layer):
     Returns:
       TPUEstimatorSpec if use tpu else EstimatorSpec
     """
+    tf.logging.info("SSY : %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     _create_dummy_vars()
     hparams = copy.deepcopy(hparams)
 
     # Instantiate model
     data_parallelism = None
     if not use_tpu and config:
+      tf.logging.info("SSY : get data_parallelism %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
       data_parallelism = config.data_parallelism
+
+    tf.logging.info("SSY : before cls build myself class T2TModel %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     model = cls(
         hparams,
         mode,
         data_parallelism=data_parallelism,
         decode_hparams=decode_hparams)
+    tf.logging.info("SSY : after cls %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
 
     # PREDICT mode
     if mode == tf.estimator.ModeKeys.PREDICT:
@@ -1011,11 +1036,13 @@ class T2TModel(base.Layer):
     assert mode == tf.estimator.ModeKeys.TRAIN
     num_async_replicas = (1 if (use_tpu or not config) else
                           config.t2t_device_info["num_async_replicas"])
+    tf.logging.info("SSY : %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     return model.estimator_spec_train(
         loss, num_async_replicas=num_async_replicas)
 
   def estimator_spec_train(self, loss, num_async_replicas=1):
     """Construct EstimatorSpec for TRAIN mode."""
+    tf.logging.info("SSY : %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     train_op = self.optimize(loss, num_async_replicas=num_async_replicas)
 
     if common_layers.is_on_tpu():
@@ -1027,6 +1054,7 @@ class T2TModel(base.Layer):
           train_op=train_op,
           host_call=host_call)
     else:
+      tf.logging.info("SSY : %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
       return tf.estimator.EstimatorSpec(
           tf.estimator.ModeKeys.TRAIN, loss=loss, train_op=train_op)
 
@@ -1374,6 +1402,7 @@ def scheduled_sampling(hparams, problem_hparams, dp, sharded_logits, losses,
         new_features["targets"] = target_modality.targets_bottom_sharded(
             new_targets, dp)
       with tf.variable_scope("body"):
+        tf.logging.info("SSY : icalling model.model_fn_sharded %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
         body_outputs, losses = model.model_fn_sharded(new_features)
         if not isinstance(losses, dict):  # If it's a single extra loss.
           losses = {"extra": losses}
@@ -1423,6 +1452,7 @@ def average_sharded_losses(sharded_losses):
 
 
 def summarize_features(features, num_shards=1):
+  tf.logging.info("SSY :  %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   with tf.name_scope("input_stats"):
     for (k, v) in sorted(six.iteritems(features)):
       if isinstance(v, tf.Tensor) and v.get_shape().ndims > 1:

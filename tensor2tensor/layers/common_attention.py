@@ -21,6 +21,9 @@ import collections
 import functools
 import math
 import operator
+import sys
+import os
+import time
 
 # Dependency imports
 import numpy as np
@@ -116,7 +119,8 @@ def get_standardized_layers(hparams, dp=None, ps_devices=None):
       return y, extra_loss
 
     return decorator
-
+  print("hparams")
+  print(hparams)
   total_key_depth = hparams.attention_key_channels or hparams.hidden_size
   total_value_depth = hparams.attention_value_channels or hparams.hidden_size
   is_train = hparams.mode == tf.estimator.ModeKeys.TRAIN
@@ -2741,6 +2745,7 @@ def multihead_attention(query_antecedent,
     ValueError: if the key depth or value depth are not divisible by the
       number of attention heads.
   """
+  tf.logging.info("SSY : fns multihead_attention %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   if total_key_depth % num_heads != 0:
     raise ValueError("Key depth (%d) must be divisible by the number of "
                      "attention heads (%d)." % (total_key_depth, num_heads))
@@ -3801,6 +3806,7 @@ def multihead_self_attention_reduced(
   Raises:
     ValueError: If reduction_type or nonlinearity is invalid
   """
+  tf.logging.info("SSY : fns multihead_self_attention_reduced %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   if not factor or not multihead_params:
     raise ValueError("factor and multihead_params should be set")
   if memory_antecedent is not None:

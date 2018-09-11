@@ -16,7 +16,8 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
+import sys
+import time
 # Dependency imports
 
 import numpy as np
@@ -31,6 +32,7 @@ from tensorflow.python.framework import dtypes
 
 def optimize(loss, learning_rate, hparams, use_tpu=False):
   """Minimize loss."""
+  tf.logging.info("SSY : %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   loss = weight_decay_and_noise(loss, hparams, learning_rate)
   loss = tf.identity(loss, name="total_loss")
   log_variable_sizes(verbose=hparams.summarize_vars)
@@ -54,7 +56,7 @@ def optimize(loss, learning_rate, hparams, use_tpu=False):
   if hparams.grad_noise_scale:
     tf.logging.info("Adding noise to gradients, noise scale: %0.5f",
                     hparams.grad_noise_scale)
-
+  tf.logging.info("SSY : calling optimize_loss s%s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   train_op = tf.contrib.layers.optimize_loss(
       name="training",
       loss=loss,
@@ -72,20 +74,24 @@ class ConditionalOptimizer(tf.train.Optimizer):
   """Conditional optimizer."""
 
   def __init__(self, optimizer_name, lr, hparams, use_tpu=False):
+    tf.logging.info("SSY : creating ConditionalOptimizer %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     if optimizer_name == "Adam" and use_tpu:
       # LazyAdamOptimizer does not work on TPU
       optimizer_name = "TrueAdam"
 
     tf.logging.info("Using optimizer %s", optimizer_name)
+    tf.logging.info("SSY : %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
 
     if optimizer_name == "Adam":
       # We change the default epsilon for Adam and re-scale lr.
       # Using LazyAdam as it's much faster for large vocabulary embeddings.
+      tf.logging.info("SSY : creating LazyAdamOptimizer without __init__%s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
       self._opt = tf.contrib.opt.LazyAdamOptimizer(
           lr,
           beta1=hparams.optimizer_adam_beta1,
           beta2=hparams.optimizer_adam_beta2,
           epsilon=hparams.optimizer_adam_epsilon)
+      tf.logging.info("SSY : finished LazyAdamOptimizer %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     elif optimizer_name == "Momentum":
       self._opt = tf.train.MomentumOptimizer(
           lr,
@@ -106,6 +112,7 @@ class ConditionalOptimizer(tf.train.Optimizer):
       self._opt = tf.contrib.layers.OPTIMIZER_CLS_NAMES[optimizer_name](lr)
 
   def compute_gradients(self, loss, var_list=None, **kwargs):
+    tf.logging.info("SSY : %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     gradients = self._opt.compute_gradients(loss, var_list, **kwargs)
     def cast_grad(g, v):
       if v is None or g is None:
@@ -115,6 +122,7 @@ class ConditionalOptimizer(tf.train.Optimizer):
     return gradients
 
   def apply_gradients(self, grads_and_vars, global_step=None, name=None):
+    tf.logging.info("SSY : %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     return self._opt.apply_gradients(
         grads_and_vars, global_step=global_step, name=name)
 

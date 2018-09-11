@@ -24,6 +24,9 @@ from __future__ import print_function
 
 import functools
 import math
+import sys
+import os
+import time
 
 # Dependency imports
 
@@ -127,6 +130,7 @@ class Parallelism(object):
       a Parallelism.
     """
     assert device_names_or_functions
+    tf.logging.info("SSY : __init__ Parallelism %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     self._devices = device_names_or_functions
     self._n = len(device_names_or_functions)
     self._reuse = reuse
@@ -149,6 +153,7 @@ class Parallelism(object):
       tuple of lists of length n (if fn returns a tuple).
     """
     # Construct lists or args and kwargs for each function.
+    tf.logging.info("SSY : __call__ %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     if args:
       my_args = transpose_list_of_lists(
           [self._maybe_repeat(arg) for arg in args])
@@ -168,10 +173,12 @@ class Parallelism(object):
     cache = {}
     tensor_to_var = {}
     for i in range(self.n):
-
+      tf.logging.info("SSY : for i=%d %s:%d %s %f",i,__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
       def daisy_chain_getter(getter, name, *args, **kwargs):
         """Get a variable and cache in a daisy chain."""
         device_var_key = (self._devices[i], name)
+        tf.logging.info("SSY : name {}".format(name))
+        tf.logging.info("SSY : i {}".format(i))
         if device_var_key in cache:
           # if we have the variable on the correct device, return it.
           return cache[device_var_key]
@@ -180,9 +187,12 @@ class Parallelism(object):
           last_device_v = cache[name]
           var = tensor_to_var[last_device_v]
           v = tf.identity(last_device_v)
+          tf.logging.info("SSY : daisy chaine {}".format(last_device_v))
+          tf.logging.info("SSY : daisy chaine {}".format(var))
         else:
           var = getter(name, *args, **kwargs)
           v = tf.identity(var._ref())  # pylint: disable=protected-access
+          tf.logging.info("SSY : from getter {}".format(var))
 
         # keep track of the original variable
         tensor_to_var[v] = var
@@ -227,9 +237,13 @@ class Parallelism(object):
           # device, for example in local_moe.
           if self._devices[i] != DEFAULT_DEV_STRING:
             with tf.device(self._devices[i]):
+              tf.logging.info("SSY : before append with fns %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
               outputs.append(fns[i](*my_args[i], **my_kwargs[i]))
+              tf.logging.info("SSY : after append with fns %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
           else:
+            tf.logging.info("SSY : before append with fns %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
             outputs.append(fns[i](*my_args[i], **my_kwargs[i]))
+            tf.logging.info("SSY : after append with fns %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     if isinstance(outputs[0], tuple):
       outputs = list(zip(*outputs))
       outputs = tuple([list(o) for o in outputs])
@@ -926,6 +940,7 @@ def distributed_moe(data_parallelism,
       training loss of the model.  The backpropagation of this loss
       encourages all experts to be approximately equally used across a batch.
   """
+  tf.logging.info("SSY : fns distributed_moe %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   dp = data_parallelism
   # create a parallelism object for running the experts.
   #   We use the default of reuse=False.  Otherwise, the experts would all

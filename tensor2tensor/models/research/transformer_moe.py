@@ -31,6 +31,8 @@ from tensor2tensor.utils import registry
 from tensor2tensor.utils import t2t_model
 
 import tensorflow as tf
+import time
+import sys
 
 
 # The transformer architecture can be defined using the layer_types hparams.
@@ -64,11 +66,12 @@ class TransformerMoe(t2t_model.T2TModel):
 
   def body_sharded(self, sharded_features):
     # ========= Prepare the input and target =========
-
+    tf.logging.info("SSY : getting dp %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     hparams = self._hparams
     dp = self._data_parallelism
 
     # Process input
+    tf.logging.info("SSY : sharding encoder-decoder pair input %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     inputs = sharded_features["inputs"]
     target_space = sharded_features["target_space_id"]
     (
@@ -78,6 +81,7 @@ class TransformerMoe(t2t_model.T2TModel):
     ) = dp(self._prepare_encoder, inputs, target_space)
 
     # Process output
+    tf.logging.info("SSY : sharding encoder-decoder pair output %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     targets = sharded_features["targets"]
     decoder_input, decoder_self_attention_bias = dp(
         self._prepare_decoder, targets
@@ -95,16 +99,20 @@ class TransformerMoe(t2t_model.T2TModel):
       """Apply processing and capture the extra loss."""
       @expert_utils.add_var_scope()
       def decorated(x, *args, **kwargs):
+        # first place the input
         x = dp_preprocess(x)
+        # the place the fct function
         y, loss = fct(x, *args, **kwargs)
         cache["extra_loss"] += loss
+        # finally place the output
         return dp_postprocess(x, y)
       return decorated
 
     # ========= Compute the transformer architecture =========
-
+    tf.logging.info("SSY : self._extract_layer_types %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     encoder_layers, decoder_layers = self._extract_layer_types()
-
+    
+    tf.logging.info("SSY : common_attention.get_standardized_layers %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     layers = common_attention.get_standardized_layers(
         hparams=hparams,
         dp=dp,
@@ -124,7 +132,7 @@ class TransformerMoe(t2t_model.T2TModel):
     # ========= Construct the transformer encoder and decoder =========
 
     encoder_outputs = []
-
+    tf.logging.info("SSY : creating encoder %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     x = encoder_input
     with tf.variable_scope("encoder"):
       for layer_num, block_types in enumerate(encoder_layers):
@@ -132,6 +140,9 @@ class TransformerMoe(t2t_model.T2TModel):
         # * self-attention block
         # * feed-forward block
         att_type, ff_type = block_types
+        tf.logging.info("layer_num {}".format(layer_num))
+        tf.logging.info("att_type {}".format(att_type))
+        tf.logging.info("ff_type {}".format(ff_type))
         with tf.variable_scope("layer_{}".format(layer_num)):
           x = prepostprocess(layers[att_type])(
               x,
@@ -145,7 +156,8 @@ class TransformerMoe(t2t_model.T2TModel):
         encoder_outputs.append(x)
       if encoder_outputs:
         encoder_outputs[-1] = dp_preprocess(x)
-
+    
+    tf.logging.info("SSY : creating decoder %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     x = decoder_input
     with tf.variable_scope("decoder"):
       for layer_num, block_types in enumerate(decoder_layers):
@@ -154,6 +166,10 @@ class TransformerMoe(t2t_model.T2TModel):
         # * enco-deco attention block (optional)
         # * feed-forward block
         self_att_type, att_ende_type, ff_type = block_types
+        tf.logging.info("layer_num {}".format(layer_num))
+        tf.logging.info("self_att_type {}".format(self_att_type))
+        tf.logging.info("att_ende_type {}".format(att_ende_type))
+        tf.logging.info("ff_type {}".format(ff_type))
         with tf.variable_scope("layer_{}".format(layer_num)):
           x = prepostprocess(layers[self_att_type])(
               x,
@@ -183,6 +199,7 @@ class TransformerMoe(t2t_model.T2TModel):
   @expert_utils.add_name_scope()
   def _prepare_encoder(self, inputs, target_space):
     """Process the transformer encoder inputs."""
+    tf.logging.info("SSY : fns _prepare_encoder %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     inputs = common_layers.flatten4d3d(inputs)
 
     output = transformer.transformer_prepare_encoder(
@@ -201,6 +218,7 @@ class TransformerMoe(t2t_model.T2TModel):
   @expert_utils.add_name_scope()
   def _prepare_decoder(self, targets):
     """Process the transformer decoder input."""
+    tf.logging.info("SSY : fns _prepare_decoder %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     targets = common_layers.flatten4d3d(targets)
 
     output = transformer.transformer_prepare_decoder(
@@ -223,6 +241,8 @@ class TransformerMoe(t2t_model.T2TModel):
     """
     hparams = self._hparams
     layer_types = hparams.layer_types
+    print("SSY layer_types")
+    print(layer_types)
 
     # If the architecture has not explicitly been set, we just construct a
     # standard transformer with the fallback values
@@ -243,6 +263,8 @@ class TransformerMoe(t2t_model.T2TModel):
 
     # Extend the blocks and fill them with the default values if not specified
     final_layers = ([], [])
+    print("SSY layer_types")
+    print(layer_types)
     for i, blocks_str in enumerate(layer_types):
       for blocks_str in blocks_str.split(SEP_LAYER):
         if not blocks_str:
@@ -329,6 +351,386 @@ def transformer_moe_8k():
   return hparams
 
 
+
+@registry.register_hparams
+def transformer_moe_bs2_moe2():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 2
+  hparams.moe_num_experts = 2
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs2_moe16():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 2
+  hparams.moe_num_experts = 16
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs2_moe512():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 2
+  hparams.moe_num_experts = 512
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs32_moe2():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 32
+  hparams.moe_num_experts = 2
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs32_moe16():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 32
+  hparams.moe_num_experts = 16
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs32_moe512():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 32
+  hparams.moe_num_experts = 512
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs512_moe2():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 512
+  hparams.moe_num_experts = 2
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs512_moe16():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 512
+  hparams.moe_num_experts = 16
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs512_moe512():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 512
+  hparams.moe_num_experts = 512
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs8192_moe2():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 8192
+  hparams.moe_num_experts = 2
+  summarize_vars=True
+  return hparams
+
+
+
+
+################## bs 128 ####################
+@registry.register_hparams
+def transformer_moe_bs128_moe16():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 128
+  hparams.moe_num_experts = 16
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs128_moe32():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 128
+  hparams.moe_num_experts = 32
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs128_moe64():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 128
+  hparams.moe_num_experts = 64
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs128_moe128():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 128
+  hparams.moe_num_experts = 128
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs128_moe256():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 128
+  hparams.moe_num_experts = 256
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs128_moe512():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 128
+  hparams.moe_num_experts = 512
+  summarize_vars=True
+  return hparams
+
+######################## bs 8192 ##########
+@registry.register_hparams
+def transformer_moe_bs8192_moe16():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 8192
+  hparams.moe_num_experts = 16
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs8192_moe32():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 8192
+  hparams.moe_num_experts = 32
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs8192_moe64():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 8192
+  hparams.moe_num_experts = 64
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs8192_moe128():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 8192
+  hparams.moe_num_experts = 128
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs8192_moe256():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 8192
+  hparams.moe_num_experts = 256
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs8192_moe512():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 8192
+  hparams.moe_num_experts = 512
+  summarize_vars=True
+  return hparams
+
+##################### bs 1024  ##################3
+@registry.register_hparams
+def transformer_moe_bs1024_moe16():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 1024
+  hparams.moe_num_experts = 16
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs1024_moe32():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 1024
+  hparams.moe_num_experts = 32
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs1024_moe64():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 1024
+  hparams.moe_num_experts = 64
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs1024_moe128():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 1024
+  hparams.moe_num_experts = 128
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs1024_moe256():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 1024
+  hparams.moe_num_experts = 256
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs1024_moe512():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 1024
+  hparams.moe_num_experts = 512
+  summarize_vars=True
+  return hparams
+
+##############3testting 32 exprts trend
+@registry.register_hparams
+def transformer_moe_bs16_moe32():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 16
+  hparams.moe_num_experts = 32
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs32_moe32():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 32
+  hparams.moe_num_experts = 32
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs64_moe32():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 64
+  hparams.moe_num_experts = 32
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs256_moe32():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 256
+  hparams.moe_num_experts = 32
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs512_moe32():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 512
+  hparams.moe_num_experts = 32
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs2048_moe32():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 2048
+  hparams.moe_num_experts = 32
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs4096_moe32():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 4096
+  hparams.moe_num_experts = 32
+  summarize_vars=True
+  return hparams
+
+@registry.register_hparams
+def transformer_moe_bs16384_moe32():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 16384
+  hparams.moe_num_experts = 32
+  summarize_vars=True
+  return hparams
+
+####################misc setting
+@registry.register_hparams
+def transformer_moe_bs4096_moe64():
+  """Hyper parameters specifics for long sequence generation."""
+  """transformer_moe_2k have moe layer which is not in 8k """
+  hparams = transformer_moe_2k()
+  hparams.batch_size = 4096
+  hparams.moe_num_experts = 64
+  summarize_vars=True
+  return hparams
+
+
 @registry.register_hparams
 def transformer_moe_8k_lm():
   """Language modeling params.
@@ -393,6 +795,13 @@ def transformer_moe_2k():
   encoder_archi = "a/a/a/a/a"
   decoder_archi = "a-sepm/a-sepm/a-moe/a-sepm/a-sepm"
   hparams.layer_types = "{}#{}".format(encoder_archi, decoder_archi)
+
+  
+  # This setting controls whether to copy variables around in a daisy chain
+  # (if true) or leave their placement to TensorFlow. It only affects multi
+  # device training and mostly should be turned on for performance. One
+  # exception are recurrent models: with dynamic loops it must be off.
+  #hparams.daisy_chain_variables=False
 
   return hparams
 

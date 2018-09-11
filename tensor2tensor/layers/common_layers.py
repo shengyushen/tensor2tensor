@@ -24,6 +24,9 @@ import functools
 from functools import partial
 import math
 import random
+import sys
+import time
+import os
 
 # Dependency imports
 
@@ -763,6 +766,7 @@ def layer_preprocess(layer_input, hparams):
   Returns:
     a Tensor
   """
+  tf.logging.info("SSY : fns layer_preprocess %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   assert "a" not in hparams.layer_preprocess_sequence, (
       "No residual connections allowed in hparams.layer_preprocess_sequence")
   return layer_prepostprocess(
@@ -800,6 +804,7 @@ def layer_postprocess(layer_input, layer_output, hparams):
   Returns:
     a Tensor
   """
+  tf.logging.info("SSY : fns layer_postprocess %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   return layer_prepostprocess(
       layer_input,
       layer_output,
@@ -1554,6 +1559,7 @@ def conv_hidden_relu(inputs,
                      dropout=0.0,
                      **kwargs):
   """Hidden layer with RELU activation followed by linear projection."""
+  tf.logging.info("SSY : fns conv_hidden_relu %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   name = kwargs.pop("name") if "name" in kwargs else None
   with tf.variable_scope(name, "conv_hidden_relu", [inputs]):
     if inputs.get_shape().ndims == 3:

@@ -106,7 +106,8 @@ def _maybe_download_corpus(tmp_dir):
 
 
 @registry.register_problem
-class LanguagemodelLm1b32k(text_problems.Text2SelfProblem):
+class LanguagemodelLm1b32k(text_problems.Text2TextProblem):
+#class LanguagemodelLm1b32k(text_problems.Text2SelfProblem):
   """A language model on the 1B words corpus.
 
   Ratio of dev tokens (including eos) to dev words (including eos)

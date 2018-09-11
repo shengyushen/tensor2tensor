@@ -18,6 +18,9 @@ from __future__ import division
 from __future__ import print_function
 
 import inspect
+import sys
+import os
+import time
 
 # Dependency imports
 
@@ -172,6 +175,7 @@ def data_parallelism(daisy_chain_variables=True,
   tf.logging.info("datashard_devices: %s", datashard_devices)
   tf.logging.info("caching_devices: %s", caching_devices)
   tf.logging.info("ps_devices: %s", ps_devices(all_workers=all_workers))
+  tf.logging.info("SSY : creating eu.Parallelism with devices %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   return eu.Parallelism(
       datashard_devices,
       caching_devices=caching_devices,

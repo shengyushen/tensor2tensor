@@ -20,13 +20,14 @@ from __future__ import print_function
 import contextlib
 import os
 import sys
+import time
 
 # Dependency imports
 
 from tensor2tensor import models  # pylint: disable=unused-import
 from tensor2tensor import problems as problems_lib  # pylint: disable=unused-import
-from tensor2tensor.utils import cloud_mlengine
-from tensor2tensor.utils import cloud_tpu
+#from tensor2tensor.utils import cloud_mlengine
+#from tensor2tensor.utils import cloud_tpu
 from tensor2tensor.utils import decoding
 from tensor2tensor.utils import flags as t2t_flags  # pylint: disable=unused-import
 from tensor2tensor.utils import registry
@@ -150,10 +151,12 @@ def create_hparams():
     tf.logging.warn("Not all hyperparameter sets work on TPU. "
                     "Prefer hparams_sets with a '_tpu' suffix, "
                     "e.g. transformer_tpu, if available for your model.")
+  #tf.logging.info("create_hparams daisy_chain_variables {}".format(FLAGS.hparams.daisy_chain_variables))
   return trainer_lib.create_hparams(FLAGS.hparams_set, FLAGS.hparams)
 
 
 def create_experiment_fn():
+  tf.logging.info("SSY : %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   return trainer_lib.create_experiment_fn(
       model_name=FLAGS.model,
       problem_name=FLAGS.problem,
@@ -182,6 +185,8 @@ def create_run_config(hp):
   Returns:
     a run config
   """
+  tf.logging.info("SSY : create_run_config %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
+  tf.logging.info("SSY : create_run_config daisy_chain_variables {}".format(hp.daisy_chain_variables))
   save_ckpt_steps = max(FLAGS.iterations_per_loop, FLAGS.local_eval_frequency)
   save_ckpt_secs = FLAGS.save_checkpoints_secs or None
   if save_ckpt_secs:
@@ -193,6 +198,7 @@ def create_run_config(hp):
       hp.daisy_chain_variables and
       hp.activation_dtype == "float32" and
       hp.weight_dtype == "float32")
+  tf.logging.warn("daisy_chain_variables {}".format(daisy_chain_variables))
   return trainer_lib.create_run_config(
       model_dir=os.path.expanduser(FLAGS.output_dir),
       master=FLAGS.master,
@@ -299,6 +305,7 @@ def execute_schedule(exp):
     raise ValueError(
         "Experiment has no method %s, from --schedule" % FLAGS.schedule)
   with profile_context():
+    tf.logging.info("SSY : scheduling jobs %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     getattr(exp, FLAGS.schedule)()
 
 
@@ -328,6 +335,7 @@ def maybe_cloud_tpu():
 
 def main(argv):
   tf.logging.set_verbosity(tf.logging.INFO)
+  tf.logging.info("SSY : entry  %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   trainer_lib.set_random_seed(FLAGS.random_seed)
   usr_dir.import_usr_dir(FLAGS.t2t_usr_dir)
   log_registry()
@@ -338,14 +346,16 @@ def main(argv):
   if FLAGS.generate_data:
     generate_data()
 
-  if cloud_mlengine.job_dir():
-    FLAGS.output_dir = cloud_mlengine.job_dir()
+#  if cloud_mlengine.job_dir():
+#    FLAGS.output_dir = cloud_mlengine.job_dir()
 
   if argv:
     set_hparams_from_args(argv[1:])
   hparams = create_hparams()
 
   with maybe_cloud_tpu():
+    # ssy create the estimator
+    tf.logging.info("SSY : creating exp fn  %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     exp_fn = create_experiment_fn()
     exp = exp_fn(create_run_config(hparams), hparams)
     if is_chief():

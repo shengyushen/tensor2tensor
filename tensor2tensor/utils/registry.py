@@ -150,6 +150,7 @@ def list_models():
 
 def register_hparams(name=None):
   """Register an HParams set. name defaults to function name snake-cased."""
+  tf.logging.info("SSY : register_hparams {}".format(name))
 
   def decorator(hp_fn, registration_name=None):
     """Registers & returns hp_fn with registration_name or default name."""
@@ -168,6 +169,8 @@ def register_hparams(name=None):
 
 
 def hparams(name):
+  tf.logging.info("SSY : hparams name {}".format(name))
+  tf.logging.info("SSY : hparams daisy_chain_variables {}".format(_HPARAMS[name]().daisy_chain_variables))
   if name not in _HPARAMS:
     error_msg = "HParams set %s never registered. Sets registered:\n%s"
     raise LookupError(

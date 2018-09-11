@@ -27,6 +27,7 @@ from tensor2tensor.utils import data_reader
 from tensor2tensor.utils import metrics
 import tensorflow as tf
 
+import time
 
 
 class DatasetSplit(object):
@@ -714,15 +715,19 @@ class Problem(object):
     Returns:
       (features_dict<str name, Tensor feature>, Tensor targets)
     """
+    start = time.time()
     partition_id, num_partitions = self._dataset_partition(mode, config)
 
     is_training = mode == tf.estimator.ModeKeys.TRAIN
+    tf.logging.info("input_fn {}".format(is_training))
     if config and config.use_tpu:
       num_threads = 64
     else:
       num_threads = 4 if is_training else 1
 
     max_length = self.max_length(hparams)
+    duration = time.time() - start
+    tf.logging.info("input fn 1   %f secs ", duration)
 
     def tpu_valid_size(example):
       return data_reader.example_valid_size(example, hparams.min_length,
@@ -739,6 +744,8 @@ class Problem(object):
       return standardize_shapes(example, batch_size=batch_size)
 
     # Read and preprocess
+    duration = time.time() - start
+    tf.logging.info("input fn 2   %f secs ", duration)
     data_dir = data_dir or (hasattr(hparams, "data_dir") and hparams.data_dir)
 
     dataset_kwargs = dataset_kwargs or {}
@@ -751,6 +758,8 @@ class Problem(object):
         "num_partitions": num_partitions,
     })
 
+    duration = time.time() - start
+    tf.logging.info("input fn 3   %f secs ", duration)
     dataset = self.dataset(**dataset_kwargs)
     if is_training:
       # Repeat and skip a random number of records
@@ -764,9 +773,13 @@ class Problem(object):
       #  shuffling.
       dataset = skip_random_fraction(dataset, data_files[0])
 
+    duration = time.time() - start
+    tf.logging.info("input fn 4   %f secs ", duration)
     dataset = dataset.map(
         data_reader.cast_ints_to_int32, num_parallel_calls=num_threads)
 
+    duration = time.time() - start
+    tf.logging.info("input fn 5   %f secs ", duration)
     if self.batch_size_means_tokens:
       batch_size_means_tokens = True
     else:
@@ -778,6 +791,8 @@ class Problem(object):
         batch_size_means_tokens = True
 
     # Batching
+    duration = time.time() - start
+    tf.logging.info("input fn 6   %f secs ", duration)
     if not batch_size_means_tokens:
       # Batch size means examples per datashard.
       if config and config.use_tpu:
@@ -830,6 +845,8 @@ class Problem(object):
 
           dataset = dataset.map(_pad_batch, num_parallel_calls=num_threads)
 
+    duration = time.time() - start
+    tf.logging.info("input fn 7   %f secs ", duration)
     dataset = dataset.map(define_shapes, num_parallel_calls=num_threads)
 
     def prepare_for_output(example):
@@ -842,9 +859,13 @@ class Problem(object):
       else:
         return example, example["targets"]
 
+    duration = time.time() - start
+    tf.logging.info("input fn 8   %f secs ", duration)
     dataset = dataset.map(prepare_for_output, num_parallel_calls=num_threads)
     dataset = dataset.prefetch(2)
 
+    duration = time.time() - start
+    tf.logging.info("input fn 9   %f secs ", duration)
     if mode == tf.estimator.ModeKeys.PREDICT:
       # This is because of a bug in the Estimator that short-circuits prediction
       # if it doesn't see a QueueRunner. DummyQueueRunner implements the
@@ -852,6 +873,8 @@ class Problem(object):
       tf.add_to_collection(tf.GraphKeys.QUEUE_RUNNERS,
                            data_reader.DummyQueueRunner())
 
+    duration = time.time() - start
+    tf.logging.info("input fn 10   %f secs ", duration)
     return dataset
 
   def serving_input_fn(self, hparams):

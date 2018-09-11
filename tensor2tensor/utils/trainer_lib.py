@@ -19,7 +19,9 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import sys
 import random
+import time
 
 # Dependency imports
 
@@ -73,6 +75,8 @@ def create_hparams(hparams_set,
                    problem_name=None):
   """Create HParams with data_dir and problem hparams, if kwargs provided."""
   hparams = registry.hparams(hparams_set)()
+  tf.logging.info("create_hparams hparams_set {}".format(hparams_set))
+  tf.logging.info("create_hparams daisy_chain_variables {}".format(hparams.daisy_chain_variables))
   if data_dir:
     hparams.add_hparam("data_dir", data_dir)
   if problem_name:
@@ -156,6 +160,7 @@ def create_run_config(master="",
     config.t2t_device_info = {
         "num_async_replicas": num_async_replicas,
     }
+    tf.logging.info("SSY : calling devices.data_parallelism %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     config.data_parallelism = devices.data_parallelism(
         daisy_chain_variables=daisy_chain_variables,
         ps_replicas=ps_replicas,
@@ -181,6 +186,7 @@ def create_estimator(model_name,
                      decode_hparams=None,
                      use_tpu=False):
   """Create a T2T Estimator."""
+  tf.logging.info("SSY : creating estimator %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   model_fn = t2t_model.T2TModel.make_estimator_model_fn(
       model_name, hparams, decode_hparams=decode_hparams, use_tpu=use_tpu)
 
@@ -199,6 +205,7 @@ def create_estimator(model_name,
         eval_batch_size=batch_size if "eval" in schedule else None,
         predict_batch_size=predict_batch_size)
   else:
+    tf.logging.info("SSY : final creating estimator %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
     return tf.estimator.Estimator(
         model_fn=model_fn, model_dir=run_config.model_dir, config=run_config)
 
@@ -258,6 +265,7 @@ def create_experiment(run_config,
                       eval_early_stopping_metric_minimize=True,
                       use_tpu=False):
   """Create Experiment."""
+  tf.logging.info("SSY : creating exp %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   # HParams
   hparams.add_hparam("model_dir", run_config.model_dir)
   hparams.add_hparam("data_dir", data_dir)
@@ -266,6 +274,7 @@ def create_experiment(run_config,
   add_problem_hparams(hparams, problem_name)
 
   # Estimator
+  tf.logging.info("SSY : creating estimator %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   estimator = create_estimator(
       model_name,
       hparams,
@@ -341,7 +350,10 @@ def create_experiment(run_config,
 def create_experiment_fn(*args, **kwargs):
   """Wrapper for canonical experiment_fn. See create_experiment."""
 
+  tf.logging.info("SSY : %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
   def experiment_fn(run_config, hparams):
+    tf.logging.info("SSY : creating exp %s:%d %s %f",__file__,sys._getframe().f_lineno,sys._getframe().f_code.co_name,time.time())
+    tf.logging.info('Using config in experiment_fn %s', str(vars(run_config)))
     return create_experiment(run_config, hparams, *args, **kwargs)
 
   return experiment_fn
