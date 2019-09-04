@@ -1,0 +1,6 @@
+1 I need to use python 3 to run setup.py
+2 apt-get install libevent-dev 
+but it fail to download and compile gevent
+
+
+

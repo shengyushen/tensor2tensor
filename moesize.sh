@@ -1,0 +1,1 @@
+grep Trainable $1/*.log |awk -F: '{nn1=split($5,arrn1," ");n=split($1,arr,"/");n1=split(substr(arr[n],1,length(arr[n])-4),arr1,"_");moen=substr(arr1[2],4,length(arr1[2])-3);print  moen " " arrn1[nn1]}'|sort|uniq |sort -n

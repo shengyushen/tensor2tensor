@@ -106,7 +106,10 @@ def _maybe_download_corpus(tmp_dir):
 
 
 @registry.register_problem
+# In trainning, I need this to refer to input
 class LanguagemodelLm1b32k(text_problems.Text2TextProblem):
+# this is the correct one
+# in generating the data, this can avoid referring to inputs key
 #class LanguagemodelLm1b32k(text_problems.Text2SelfProblem):
   """A language model on the 1B words corpus.
 
